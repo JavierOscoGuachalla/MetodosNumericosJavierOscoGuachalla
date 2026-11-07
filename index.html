@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hidroponía eficiente: simulación de nutrientes con EDO</title>
+<style>
+:root{--bg:#eef5f3;--card:#fff;--ink:#12302b;--mut:#4d6a65;--line:#cfe0dc;--acc:#0f8b7a;--heun:#c47f00;--rk4:#4a5bd0;--ex:#12302b;--err:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1f1c;--card:#14302b;--ink:#e6f3f0;--mut:#9fc0b9;--line:#26493f;--acc:#3cc4ae;--heun:#f0b24a;--rk4:#8c9bff;--ex:#e6f3f0;--err:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia,"Times New Roman",serif}
+header{padding:2.2rem 1rem 1.4rem;max-width:1000px;margin:auto}
+h1{font-size:clamp(1.6rem,4.5vw,2.5rem);line-height:1.15;margin:.2rem 0 .6rem;letter-spacing:-.01em}
+h2{font-size:1.25rem;margin:0 0 .6rem}
+p{margin:.4rem 0}
+main{max-width:1000px;margin:auto;padding:0 1rem 3rem;display:grid;gap:1rem}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.1rem 1.2rem}
+.mut{color:var(--mut);font-size:.92rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem}
+label{display:block;font:600 .85rem system-ui,sans-serif}
+label small{font-weight:400;color:var(--mut)}
+input{width:100%;margin-top:.25rem;padding:.5rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:1rem system-ui,sans-serif}
+input:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+button{margin-top:1rem;padding:.65rem 1.3rem;border:0;border-radius:6px;background:var(--acc);color:#fff;font:600 1rem system-ui,sans-serif;cursor:pointer}
+#errs{color:var(--err);font:600 .9rem system-ui,sans-serif;margin-top:.7rem}
+.eq{font-family:"Cambria Math",Cambria,serif;background:var(--bg);padding:.5rem .8rem;border-radius:6px;margin:.5rem 0;overflow-x:auto}
+canvas{width:100%;height:auto;display:block}
+.leg{display:flex;gap:1rem;flex-wrap:wrap;font:.85rem system-ui,sans-serif;margin-top:.4rem}
+.leg i{display:inline-block;width:22px;height:4px;vertical-align:middle;margin-right:.35rem}
+.tw{overflow:auto;max-height:340px;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font:.8rem system-ui,sans-serif;white-space:nowrap}
+th,td{padding:.35rem .6rem;text-align:right;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;background:var(--card);border-bottom:2px solid var(--line)}
+td:first-child,th:first-child{text-align:left}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.7rem;margin-top:.6rem}
+.kpi div{background:var(--bg);border-radius:8px;padding:.6rem .8rem;font:.85rem system-ui,sans-serif}
+.kpi b{display:block;font:700 1.25rem Georgia,serif}
+</style>
+</head>
+<body>
+<header>
+  <p class="mut">Métodos Numéricos · Desafío individual</p>
+  <h1>Hidroponía eficiente: cuándo y cuánto reponer en la solución nutritiva</h1>
+  <p>Simulador de la caída de nutrientes en el depósito de un huerto urbano hidropónico. Compara la solución exacta con los métodos de Heun y Runge-Kutta de 4.º orden (RK4).</p>
+</header>
+<main>
+
+<section>
+  <h2>1. El problema</h2>
+  <p>Las plantas absorben nutrientes del agua del depósito y su concentración baja con los días. Si se repone tarde, el cultivo sufre; si se repone temprano o en exceso, se desperdicia fertilizante. <b>Pregunta:</b> ¿cuántos días pasan hasta que la concentración cae a un nivel mínimo, y cuánto fertilizante hay que añadir para volver a la concentración objetivo?</p>
+  <p><b>Beneficiarios:</b> personas que mantienen huertos urbanos y pequeños productores. <b>Meta cuantificable:</b> hallar el día de reposición y los gramos de fertilizante necesarios.</p>
+  <p class="mut">Los parámetros son hipotéticos; el modelo es una simulación y no una predicción comprobada con datos reales.</p>
+</section>
+
+<section>
+  <h2>2. Modelo matemático</h2>
+  <p>Variable dependiente: <b>C(t)</b>, concentración de nutrientes (mg/L). Variable independiente: <b>t</b>, tiempo (días). Parámetro: <b>k</b>, tasa de consumo (1/día). Supuesto: las plantas absorben nutrientes a un ritmo proporcional a la concentración disponible, sin evaporación ni reposición durante el intervalo.</p>
+  <div class="eq">dC/dt = −k·C,&nbsp;&nbsp; C(0) = C₀</div>
+  <p><b>Solución analítica, paso a paso (separación de variables):</b></p>
+  <div class="eq">
+    1) Separar: dC / C = −k dt<br>
+    2) Integrar ambos lados: ∫ dC/C = ∫ −k dt<br>
+    3) Resultado: ln|C| = −k·t + c₁<br>
+    4) Exponenciar: C(t) = A·e<sup>−kt</sup>, con A = e<sup>c₁</sup><br>
+    5) Condición inicial: C(0) = A·e⁰ = A = C₀<br>
+    6) Solución: <b>C(t) = C₀·e<sup>−kt</sup></b>
+  </div>
+  <p><b>Verificación por sustitución:</b> C′(t) = −k·C₀·e<sup>−kt</sup> = −k·C(t), así que cumple la ecuación; y C(0) = C₀·e⁰ = C₀, así que cumple la condición inicial.</p>
+  <p><b>Tiempo de reposición</b> (cuando C = C<sub>mín</sub>): t* = ln(C₀ / C<sub>mín</sub>) / k.</p>
+  <p><b>Fertilizante necesario:</b> m (g) = (C<sub>obj</sub> − C<sub>actual</sub>)·V / 1000, con concentraciones en mg/L y volumen V en L.</p>
+</section>
+
+<section>
+  <h2>3. Parámetros de la simulación</h2>
+  <div class="grid">
+    <label>Concentración inicial C₀ <small>(mg/L)</small><input id="c0" type="number" value="1500" step="any"></label>
+    <label>Tasa de consumo k <small>(1/día)</small><input id="k" type="number" value="0.12" step="any"></label>
+    <label>Tiempo de simulación T <small>(días)</small><input id="T" type="number" value="20" step="any"></label>
+    <label>Tamaño de paso h <small>(días)</small><input id="h" type="number" value="2" step="any"></label>
+    <label>Concentración mínima C<sub>mín</sub> <small>(mg/L)</small><input id="cmin" type="number" value="800" step="any"></label>
+    <label>Concentración objetivo C<sub>obj</sub> <small>(mg/L)</small><input id="cobj" type="number" value="1500" step="any"></label>
+    <label>Volumen del depósito V <small>(L)</small><input id="V" type="number" value="40" step="any"></label>
+  </div>
+  <button id="run">Simular</button>
+  <div id="errs" role="alert"></div>
+</section>
+
+<section id="res" hidden>
+  <h2>4. Resultados</h2>
+  <div class="kpi" id="kpi"></div>
+  <p class="mut" style="margin-top:.8rem">Concentración de nutrientes (mg/L) a lo largo de los días</p>
+  <canvas id="c1" width="900" height="380"></canvas>
+  <div class="leg"><span><i style="background:var(--ex)"></i>Analítica</span><span><i style="background:var(--heun)"></i>Heun</span><span><i style="background:var(--rk4)"></i>RK4</span></div>
+  <p class="mut" style="margin-top:1rem">Error absoluto (mg/L) en cada paso</p>
+  <canvas id="c2" width="900" height="260"></canvas>
+  <div class="leg"><span><i style="background:var(--heun)"></i>Error Heun</span><span><i style="background:var(--rk4)"></i>Error RK4</span></div>
+</section>
+
+<section id="procS" hidden>
+  <h2>Procedimiento de los métodos numéricos</h2>
+  <p>Con f(t, C) = −k·C, cada método avanza de t<sub>n</sub> a t<sub>n+1</sub> = t<sub>n</sub> + h.</p>
+  <p><b>Heun (Runge-Kutta de 2.º orden)</b>: predice y luego corrige promediando dos pendientes.</p>
+  <div class="eq">k₁ = f(t<sub>n</sub>, C<sub>n</sub>)<br>C* = C<sub>n</sub> + h·k₁ &nbsp;(predictor)<br>k₂ = f(t<sub>n+1</sub>, C*)<br>C<sub>n+1</sub> = C<sub>n</sub> + (h/2)·(k₁ + k₂)</div>
+  <p><b>RK4 (Runge-Kutta clásico de 4.º orden)</b>: promedia cuatro pendientes con más peso en las centrales.</p>
+  <div class="eq">k₁ = f(t<sub>n</sub>, C<sub>n</sub>)<br>k₂ = f(t<sub>n</sub> + h/2, C<sub>n</sub> + (h/2)·k₁)<br>k₃ = f(t<sub>n</sub> + h/2, C<sub>n</sub> + (h/2)·k₂)<br>k₄ = f(t<sub>n</sub> + h, C<sub>n</sub> + h·k₃)<br>C<sub>n+1</sub> = C<sub>n</sub> + (h/6)·(k₁ + 2k₂ + 2k₃ + k₄)</div>
+  <p><b>Primer paso calculado con tus datos</b> (de t = 0 a t = h):</p>
+  <div class="eq" id="firstStep" style="font-size:.92rem;line-height:1.7"></div>
+</section>
+
+<section id="cmpS" hidden>
+  <h2>5. Comparación de tamaños de paso</h2>
+  <div class="tw"><table id="cmp"></table></div>
+  <p class="mut">Error máximo absoluto sobre todo el intervalo, con h y con h/2.</p>
+</section>
+
+<section id="tabS" hidden>
+  <h2>6. Tabla por pasos (h elegido)</h2>
+  <div class="tw"><table id="tab"></table></div>
+</section>
+
+<section id="intS" hidden>
+  <h2>7. Interpretación</h2>
+  <div id="interp"></div>
+  <p class="mut"><b>Limitaciones:</b> el modelo supone consumo proporcional a la concentración y un solo nutriente agregado; no incluye evaporación, pH, temperatura ni el crecimiento de las plantas. Para usarlo en la práctica habría que ajustar k con mediciones reales (por ejemplo, con un medidor de conductividad eléctrica).</p>
+</section>
+
+<section id="calcS" hidden>
+  <h2>8. Calculadora de reposición</h2>
+  <p>Con el volumen y las concentraciones ingresadas arriba. Si dejas vacía la concentración actual, se usa C<sub>mín</sub> (el momento en que conviene reponer).</p>
+  <label style="max-width:260px">Concentración actual <small>(mg/L, opcional)</small><input id="cact" type="number" step="any" placeholder="usa C mín"></label>
+  <button id="calc">Calcular fertilizante</button>
+  <p id="calcOut" style="margin-top:.8rem"></p>
+</section>
+
+</main>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const f4=x=>x.toFixed(4), f2=x=>x.toFixed(2);
+const fmt=x=>Math.abs(x)<1e-3&&x!==0?x.toExponential(2):x.toFixed(4);
+
+// ---- Métodos ----
+const F=(k,y)=>-k*y;
+function run(method,p,h){
+  const ts=[0],ys=[p.c0];let t=0,y=p.c0;
+  while(t<p.T-1e-12){
+    const hi=Math.min(h,p.T-t);
+    if(method==='heun'){
+      const k1=F(p.k,y),k2=F(p.k,y+hi*k1);
+      y+=hi/2*(k1+k2);
+    }else{
+      const k1=F(p.k,y),k2=F(p.k,y+hi/2*k1),k3=F(p.k,y+hi/2*k2),k4=F(p.k,y+hi*k3);
+      y+=hi/6*(k1+2*k2+2*k3+k4);
+    }
+    t+=hi;ts.push(t);ys.push(y);
+  }
+  return {ts,ys};
+}
+const exact=(p,t)=>p.c0*Math.exp(-p.k*t);
+function maxErr(p,h){
+  const H=run('heun',p,h),R=run('rk4',p,h);let a=0,b=0;
+  H.ts.forEach((t,i)=>{a=Math.max(a,Math.abs(exact(p,t)-H.ys[i]));b=Math.max(b,Math.abs(exact(p,t)-R.ys[i]));});
+  return [a,b];
+}
+
+// ---- Gráficas ----
+function draw(cv,series,ylab){
+  const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,m={l:70,r:15,t:15,b:40};
+  const cs=getComputedStyle(document.documentElement),col=n=>cs.getPropertyValue(n).trim();
+  ctx.clearRect(0,0,W,H);ctx.font='13px system-ui,sans-serif';
+  let xmax=0,ymin=Infinity,ymax=-Infinity;
+  series.forEach(s=>s.x.forEach((x,i)=>{xmax=Math.max(xmax,x);ymin=Math.min(ymin,s.y[i]);ymax=Math.max(ymax,s.y[i]);}));
+  if(ymin>0&&ylab!=='err')ymin=0; if(ylab==='err')ymin=0; if(ymax<=ymin)ymax=ymin+1;
+  const X=x=>m.l+x/xmax*(W-m.l-m.r),Y=y=>H-m.b-(y-ymin)/(ymax-ymin)*(H-m.t-m.b);
+  ctx.strokeStyle=col('--line');ctx.fillStyle=col('--mut');ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const yv=ymin+(ymax-ymin)*i/5,xv=xmax*i/5;
+    ctx.beginPath();ctx.moveTo(m.l,Y(yv));ctx.lineTo(W-m.r,Y(yv));ctx.stroke();
+    ctx.textAlign='right';ctx.fillText(Math.abs(yv)<0.01&&yv!==0?yv.toExponential(1):yv.toFixed(ymax>50?0:3),m.l-6,Y(yv)+4);
+    ctx.textAlign='center';ctx.fillText(xv.toFixed(1),X(xv),H-m.b+16);
+  }
+  ctx.fillText('tiempo t (días)',W/2,H-6);
+  series.forEach(s=>{
+    ctx.strokeStyle=col(s.c);ctx.fillStyle=col(s.c);ctx.lineWidth=s.w||2;
+    ctx.beginPath();s.x.forEach((x,i)=>i?ctx.lineTo(X(x),Y(s.y[i])):ctx.moveTo(X(x),Y(s.y[i])));ctx.stroke();
+    if(s.dots)s.x.forEach((x,i)=>{ctx.beginPath();ctx.arc(X(x),Y(s.y[i]),3,0,7);ctx.fill();});
+  });
+}
+
+// ---- Principal ----
+let P=null;
+function read(){
+  const g=id=>parseFloat($(id).value);
+  const p={c0:g('c0'),k:g('k'),T:g('T'),h:g('h'),cmin:g('cmin'),cobj:g('cobj'),V:g('V')};
+  const e=[];
+  for(const [n,l] of [['c0','C₀'],['k','k'],['T','T'],['h','h'],['cmin','C mín'],['cobj','C obj'],['V','V']])
+    if(!isFinite(p[n])||p[n]<=0)e.push(l+' debe ser un número mayor que 0.');
+  if(!e.length){
+    if(p.h>p.T)e.push('h no puede ser mayor que T.');
+    if(p.T/p.h>5000)e.push('Hay demasiados pasos (máx. 5000). Aumenta h o reduce T.');
+    if(p.cmin>=p.c0)e.push('C mín debe ser menor que C₀ para que haya consumo hasta reponer.');
+    if(p.cobj<p.cmin)e.push('C obj debe ser mayor o igual que C mín.');
+    if(p.k*p.h>2)e.push('k·h es muy grande (>2): los métodos pierden estabilidad. Reduce h.');
+  }
+  $('errs').textContent=e.join(' ');
+  return e.length?null:p;
+}
+function simulate(){
+  const p=read();if(!p)return;P=p;
+  const H=run('heun',p,p.h),R=run('rk4',p,p.h);
+  const ex=H.ts.map(t=>exact(p,t));
+  ['res','procS','cmpS','tabS','intS','calcS'].forEach(i=>$(i).hidden=false);
+  (function(){
+    const h=Math.min(p.h,p.T),y0=p.c0,k=p.k,r=x=>x.toFixed(4);
+    const a1=-k*y0,ys=y0+h*a1,a2=-k*ys,yH=y0+h/2*(a1+a2);
+    const b1=-k*y0,b2=-k*(y0+h/2*b1),b3=-k*(y0+h/2*b2),b4=-k*(y0+h*b3),yR=y0+h/6*(b1+2*b2+2*b3+b4);
+    const yE=exact(p,h);
+    $('firstStep').innerHTML=
+    `<b>Datos:</b> C₀ = ${y0}, k = ${k}, h = ${h}<br>`+
+    `<b>Heun:</b><br>k₁ = −${k}·${y0} = ${r(a1)}<br>C* = ${y0} + ${h}·(${r(a1)}) = ${r(ys)}<br>k₂ = −${k}·${r(ys)} = ${r(a2)}<br>C₁ = ${y0} + (${h}/2)·(${r(a1)} + ${r(a2)}) = <b>${r(yH)}</b><br><br>`+
+    `<b>RK4:</b><br>k₁ = ${r(b1)}, k₂ = ${r(b2)}, k₃ = ${r(b3)}, k₄ = ${r(b4)}<br>C₁ = ${y0} + (${h}/6)·(k₁ + 2k₂ + 2k₃ + k₄) = <b>${r(yR)}</b><br><br>`+
+    `<b>Exacta:</b> C(${h}) = ${y0}·e<sup>−${k}·${h}</sup> = <b>${r(yE)}</b><br><br>`+
+    `<b>Error absoluto en este paso:</b> Heun = ${fmt(Math.abs(yE-yH))}, RK4 = ${fmt(Math.abs(yE-yR))}`;
+  })();
+  // tabla
+  let rows='<tr><th>t (días)</th><th>Exacta</th><th>Heun</th><th>RK4</th><th>Err abs Heun</th><th>Err rel Heun %</th><th>Err abs RK4</th><th>Err rel RK4 %</th></tr>';
+  const eH=[],eR=[];
+  H.ts.forEach((t,i)=>{
+    const a=Math.abs(ex[i]-H.ys[i]),b=Math.abs(ex[i]-R.ys[i]);eH.push(a);eR.push(b);
+    rows+=`<tr><td>${f2(t)}</td><td>${f4(ex[i])}</td><td>${f4(H.ys[i])}</td><td>${f4(R.ys[i])}</td><td>${fmt(a)}</td><td>${ex[i]?fmt(a/ex[i]*100):'—'}</td><td>${fmt(b)}</td><td>${ex[i]?fmt(b/ex[i]*100):'—'}</td></tr>`;
+  });
+  $('tab').innerHTML=rows;
+  // comparación de pasos
+  const [h1a,h1b]=maxErr(p,p.h),[h2a,h2b]=maxErr(p,p.h/2);
+  $('cmp').innerHTML=`<tr><th>Paso</th><th>Error máx. Heun (mg/L)</th><th>Error máx. RK4 (mg/L)</th></tr>
+  <tr><td>h = ${+p.h.toFixed(4)} d</td><td>${fmt(h1a)}</td><td>${fmt(h1b)}</td></tr>
+  <tr><td>h/2 = ${+(p.h/2).toFixed(4)} d</td><td>${fmt(h2a)}</td><td>${fmt(h2b)}</td></tr>`;
+  // gráficas (analítica con muestreo fino)
+  const fx=[],fy=[];for(let i=0;i<=300;i++){const t=p.T*i/300;fx.push(t);fy.push(exact(p,t));}
+  draw($('c1'),[{x:fx,y:fy,c:'--ex',w:3},{x:H.ts,y:H.ys,c:'--heun',dots:1},{x:R.ts,y:R.ys,c:'--rk4',dots:1}]);
+  draw($('c2'),[{x:H.ts,y:eH,c:'--heun',dots:1},{x:R.ts,y:eR,c:'--rk4',dots:1}],'err');
+  // KPIs
+  const tr=Math.log(p.c0/p.cmin)/p.k, mH=Math.max(...eH), mR=Math.max(...eR);
+  const mejor=mR<mH?'RK4':(mH<mR?'Heun':'empate');
+  $('kpi').innerHTML=`<div>Día de reposición<b>${f2(tr)} d</b></div><div>C al final (exacta)<b>${f2(exact(p,p.T))} mg/L</b></div><div>Error máx. Heun<b>${fmt(mH)}</b></div><div>Error máx. RK4<b>${fmt(mR)}</b></div>`;
+  $('interp').innerHTML=`<p>Con C₀ = ${p.c0} mg/L y k = ${p.k} 1/día, la concentración cae a ${p.cmin} mg/L a los <b>${f2(tr)} días</b> (≈ ${Math.ceil(tr)} días si se repone en un día entero). Ese es el momento recomendado para reponer: antes se desperdicia fertilizante y después las plantas pasan por una concentración insuficiente.</p>
+  <p>En este ensayo, con h = ${p.h} d, el método con menor error fue <b>${mejor}</b> (error máximo ${fmt(Math.min(mH,mR))} mg/L frente a ${fmt(Math.max(mH,mR))} mg/L). Al reducir el paso a la mitad, Heun bajó de ${fmt(h1a)} a ${fmt(h2a)} y RK4 de ${fmt(h1b)} a ${fmt(h2b)}: un paso más pequeño siempre acerca la aproximación a la curva exacta, y RK4 lo hace mucho más rápido porque su error decrece con h⁴ (Heun, con h²).</p>`;
+  $('calcOut').textContent='';
+}
+function calc(){
+  if(!P)return;
+  const ca=$('cact').value===''?P.cmin:parseFloat($('cact').value);
+  if(!isFinite(ca)||ca<0){$('calcOut').textContent='La concentración actual debe ser un número válido (≥ 0).';return;}
+  const dm=(P.cobj-ca)*P.V/1000;
+  $('calcOut').innerHTML=dm>0?`Para pasar de ${ca} a ${P.cobj} mg/L en ${P.V} L hay que añadir <b>${f2(dm)} g</b> de nutrientes (${f2(dm*1000)} mg).`:'La concentración actual ya alcanza o supera el objetivo: no hace falta reponer.';
+}
+$('run').addEventListener('click',simulate);
+$('calc').addEventListener('click',calc);
+document.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')simulate();}));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(P)simulate();});
+simulate();
+})();
+</script>
+</body>
+</html>
