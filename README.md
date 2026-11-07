@@ -4,8 +4,8 @@
 **Autor:** [Tu nombre completo]
 **Fecha de entrega:** 6 de noviembre de 2026
 
-**Aplicación web:** [pega aquí la URL de GitHub Pages]
-**Video explicativo (1 min):** [pega aquí el enlace del video]
+**Aplicación web:** https://javieroscoguachalla.github.io/MetodosNumericosJavierOscoGuachalla/
+**Video explicativo (1 min):** (https://www.youtube.com/watch?v=1oaPLkUaCgo)
 
 ---
 
