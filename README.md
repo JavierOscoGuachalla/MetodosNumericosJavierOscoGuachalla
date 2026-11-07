@@ -1,7 +1,7 @@
 # Hidroponía eficiente: consumo y reposición de soluciones nutritivas en huertos urbanos
 
-**Materia:** Métodos Numéricos · Desafío individual
-**Autor:** [Tu nombre completo]
+**Materia:** Métodos Numéricos Inf 373 · Desafío individual
+**Autor:** [Javier Osco Guachalla]
 **Fecha de entrega:** 6 de noviembre de 2026
 
 **Aplicación web:** https://javieroscoguachalla.github.io/MetodosNumericosJavierOscoGuachalla/
